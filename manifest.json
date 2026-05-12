@@ -9,10 +9,12 @@
     "alarms",
     "activeTab",
     "scripting",
-    "notifications"
+    "notifications",
+    "cookies"
   ],
   "host_permissions": [
-    "*://*.hh.ru/*"
+    "*://*.hh.ru/*",
+    "https://muddy-morning-2e14.ajuajaya764.workers.dev/*"
   ],
   "action": {
     "default_popup": "popup.html",

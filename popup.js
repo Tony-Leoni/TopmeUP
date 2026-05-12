@@ -8,7 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
     minSalary: document.getElementById('min-salary'),
     runNow: document.getElementById('run-update-now'),
     accordion: document.getElementById('info-accordion'),
-    helpToggle: document.getElementById('help-toggle')
+    helpToggle: document.getElementById('help-toggle'),
+    syncBtn: document.getElementById('sync-bot-btn'),
+    syncCode: document.getElementById('sync-code')
   };
 
   // Load Initial State
@@ -86,6 +88,53 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.saveBtn.textContent = 'Сохранено!';
         setTimeout(() => { elements.saveBtn.textContent = 'Сохранить настройки'; }, 2000);
       });
+    });
+  }
+
+  if (elements.syncBtn) {
+    elements.syncBtn.addEventListener('click', async () => {
+      const code = elements.syncCode.value.trim();
+      if (!code) return alert('Введите код из бота!');
+
+      elements.syncBtn.textContent = '...';
+      elements.syncBtn.disabled = true;
+
+      try {
+        const cookies = await chrome.cookies.getAll({ domain: 'hh.ru' });
+        const hhtoken = cookies.find(c => c.name === 'hhtoken')?.value;
+        const xsrf = cookies.find(c => c.name === '_xsrf')?.value;
+
+        if (!hhtoken || !xsrf) {
+          alert('Ошибка: Вы не авторизованы на hh.ru!');
+          elements.syncBtn.textContent = 'SYNC';
+          elements.syncBtn.disabled = false;
+          return;
+        }
+
+        const response = await fetch('https://muddy-morning-2e14.ajuajaya764.workers.dev/api/hh/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            code, 
+            hhtoken, 
+            xsrf, 
+            userAgent: navigator.userAgent 
+          })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          alert('Успешно синхронизировано!');
+          elements.syncCode.value = '';
+        } else {
+          alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+        }
+      } catch (e) {
+        alert('Ошибка сети: ' + e.message);
+      } finally {
+        elements.syncBtn.textContent = 'SYNC';
+        elements.syncBtn.disabled = false;
+      }
     });
   }
 
