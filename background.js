@@ -165,9 +165,28 @@ async function performResumeUpdateAction() {
   const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   console.log('AI HR: Script execution started on page');
 
+  // 0. Popup Killer - Dismiss any modals or overlays that might block clicks
+  console.log('AI HR: Cleaning up popups and overlays...');
+  const popups = document.querySelectorAll('[data-qa="bloko-modal-close"], [data-qa="bloko-toast-close"], [data-qa="popover-close-button"], .bloko-modal-close');
+  popups.forEach(p => {
+    console.log('AI HR: Closing popup/modal');
+    p.click();
+  });
+  
+  // Also remove overlays manually just in case
+  const overlays = document.querySelectorAll('.bloko-modal-container, .bloko-modal-overlay, [class*="overlay"], [class*="modal-container"]');
+  overlays.forEach(o => {
+    console.log('AI HR: Removing overlay element');
+    o.remove();
+  });
+  
+  // Small wait after cleanup
+  await wait(500);
+
   // 1. Expansion logic
   const expandBtn = document.querySelector('[data-qa="resume-show-more-button"]') || 
-                    Array.from(document.querySelectorAll('button, span, a')).find(el => el.innerText && el.innerText.includes('Все резюме'));
+                    document.querySelector('[data-qa="resume-show-all"]') ||
+                    Array.from(document.querySelectorAll('button, span, a')).find(el => el.innerText && (el.innerText.includes('Все резюме') || el.innerText.includes('Показать все')));
   
   if (expandBtn) {
     console.log('AI HR: Found expansion button, clicking...', expandBtn.innerText);
@@ -249,17 +268,32 @@ async function performResumeUpdateAction() {
       title = title.split('Обновить')[0]; // Cut everything starting from "Обновить"
       title = title.trim();
       
-      const timeMatch = card.innerText.match(timeRegex);
-      let nextTimeStr = 'Готово';
+      // 3.1. Extract time with priority: "Поднять в" > "Обновлено" > any time
+      const liftTimeMatch = card.innerText.match(/Поднять в\s+(\d{1,2}:\d{2})/i);
+      const updateTimeMatch = card.innerText.match(/Обновлено\s+.*?(\d{1,2}:\d{2})/i);
+      const generalTimeMatch = card.innerText.match(timeRegex);
       
-      if (timeMatch) {
-        const hours = parseInt(timeMatch[1]);
-        const mins = parseInt(timeMatch[2]);
-        nextTimeStr = `${hours}:${mins < 10 ? '0' + mins : mins}`;
-        
+      let nextTimeStr = 'Готово';
+      let hours, mins;
+
+      if (liftTimeMatch) {
+        nextTimeStr = liftTimeMatch[1];
+        [hours, mins] = nextTimeStr.split(':').map(Number);
+      } else if (updateTimeMatch && !card.innerText.includes('Поднять в поиске')) {
+        // If it was just updated and no lift button/text is visible, use update time as base
+        // but it's usually better to say 'Готово' or wait for the next cycle
+        nextTimeStr = updateTimeMatch[1];
+        [hours, mins] = nextTimeStr.split(':').map(Number);
+      } else if (generalTimeMatch) {
+        nextTimeStr = generalTimeMatch[0];
+        [hours, mins] = nextTimeStr.split(':').map(Number);
+      }
+      
+      if (hours !== undefined && mins !== undefined) {
         const target = new Date();
         target.setHours(hours, mins, 0, 0);
         if (target < new Date()) target.setDate(target.getDate() + 1);
+        
         if (!earliestNextTime || target.getTime() < earliestNextTime) {
           earliestNextTime = target.getTime();
         }
