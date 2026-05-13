@@ -269,21 +269,23 @@ async function performResumeUpdateAction() {
       title = title.trim();
       
       // 3.1. Extract time with priority: "Поднять в" > "Обновлено" > any time
-      const liftTimeMatch = card.innerText.match(/Поднять в\s+(\d{1,2}:\d{2})/i);
-      const updateTimeMatch = card.innerText.match(/Обновлено\s+.*?(\d{1,2}:\d{2})/i);
-      const generalTimeMatch = card.innerText.match(timeRegex);
+      const liftTimeMatch = card.innerText.match(/(?:Поднять|Доступно).*?(\d{1,2}:\d{2})/i);
+      const updateTimeMatch = card.innerText.match(/Обновлено.*?(\d{1,2}:\d{2})/i);
+      const generalTimeMatch = card.innerText.match(/(\d{1,2}:\d{2})/);
       
       let nextTimeStr = 'Готово';
       let hours, mins;
+      let isFutureTime = false;
 
       if (liftTimeMatch) {
         nextTimeStr = liftTimeMatch[1];
         [hours, mins] = nextTimeStr.split(':').map(Number);
-      } else if (updateTimeMatch && !card.innerText.includes('Поднять в поиске')) {
-        // If it was just updated and no lift button/text is visible, use update time as base
-        // but it's usually better to say 'Готово' or wait for the next cycle
+        isFutureTime = true;
+      } else if (updateTimeMatch) {
         nextTimeStr = updateTimeMatch[1];
         [hours, mins] = nextTimeStr.split(':').map(Number);
+        // If it's an update time, the next lift is +4 hours
+        hours += 4;
       } else if (generalTimeMatch) {
         nextTimeStr = generalTimeMatch[0];
         [hours, mins] = nextTimeStr.split(':').map(Number);
