@@ -2,12 +2,36 @@
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log('AI HR Assistant installed');
-  // Initialize stats if not present
-  chrome.storage.local.get(['resumesUpdated', 'clicksPerformed'], (result) => {
+  chrome.storage.local.get(['autoUpdate', 'resumesUpdated', 'clicksPerformed'], (result) => {
     if (result.resumesUpdated === undefined) chrome.storage.local.set({ resumesUpdated: 0 });
     if (result.clicksPerformed === undefined) chrome.storage.local.set({ clicksPerformed: 0 });
+    
+    // При установке/обновлении проверяем, нужно ли запустить цикл
+    if (result.autoUpdate) {
+      setupAlarm(true);
+    }
   });
 });
+
+// Добавляем обработчик запуска браузера (для 100% надежности)
+chrome.runtime.onStartup.addListener(() => {
+  console.log('AI HR: Browser started. Re-initializing alarms...');
+  chrome.storage.local.get(['autoUpdate'], (result) => {
+    if (result.autoUpdate) {
+      setupAlarm(true);
+      checkAndPerformResumeUpdate(); // Проверяем сразу при запуске
+    }
+  });
+});
+
+function setupAlarm(isActive) {
+  if (isActive) {
+    // Используем период, чтобы будильник был персистентным
+    chrome.alarms.create('autoResumeUpdate', { periodInMinutes: 30 });
+  } else {
+    chrome.alarms.clear('autoResumeUpdate');
+  }
+}
 
 // Handle alarms for periodic tasks
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -19,11 +43,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('AI HR: Message received:', message.type);
   if (message.type === 'TOGGLE_AUTO_UPDATE') {
+    setupAlarm(message.value);
     if (message.value) {
-      chrome.alarms.create('autoResumeUpdate', { periodInMinutes: 30 });
       checkAndPerformResumeUpdate();
-    } else {
-      chrome.alarms.clear('autoResumeUpdate');
     }
   } else if (message.type === 'RUN_UPDATE_NOW') {
     console.log('AI HR: Manual update triggered via button');
