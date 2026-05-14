@@ -111,6 +111,26 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
+        // Получаем список резюме из хранилища
+        const storage = await chrome.storage.local.get(['resumeDetails']);
+        const resumes = (storage.resumeDetails || []).map(r => {
+          let lastLiftAt = null;
+          if (r.time && r.time.includes(':')) {
+            const [hours, mins] = r.time.split(':').map(Number);
+            const target = new Date();
+            target.setHours(hours, mins, 0, 0);
+            if (target < new Date()) target.setDate(target.getDate() + 1);
+            // HH позволяет поднимать раз в 4 часа. Вычитаем 4 часа из времени "следующего" поднятия.
+            lastLiftAt = new Date(target.getTime() - 4 * 3600 * 1000).toISOString();
+          }
+          
+          return {
+            id: r.id,
+            title: r.name,
+            last_lift_at: lastLiftAt
+          };
+        }).filter(r => r.id);
+
         const response = await fetch('https://muddy-morning-2e14.ajuajaya764.workers.dev/api/hh/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -118,13 +138,18 @@ document.addEventListener('DOMContentLoaded', () => {
             code, 
             hhtoken, 
             xsrf, 
-            userAgent: navigator.userAgent 
+            userAgent: navigator.userAgent,
+            resumes: resumes
           })
         });
 
         const result = await response.json();
         if (result.success) {
-          alert('Успешно синхронизировано!');
+          let msg = 'Успешно синхронизировано!';
+          if (resumes.length > 0) msg += `\nНайдено резюме: ${resumes.length}`;
+          else msg += '\nВНИМАНИЕ: Резюме не найдены. Откройте страницу "Мои резюме" на hh.ru и попробуйте снова.';
+          
+          alert(msg);
           elements.syncCode.value = '';
         } else {
           alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));

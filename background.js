@@ -258,9 +258,17 @@ async function performResumeUpdateAction() {
 
   if (topCards.length > 0) {
     topCards.forEach((card, index) => {
-      // Find title and clean it
+      // Find title and link
       const titleEl = card.querySelector('[data-qa*="title"], h1, h2, h3, a[href*="/resume/"]');
+      const linkEl = card.querySelector('a[href*="/resume/"]');
+      
       let title = titleEl ? titleEl.innerText.trim() : `Резюме #${index + 1}`;
+      let resumeId = null;
+
+      if (linkEl && linkEl.href) {
+        const match = linkEl.href.match(/\/resume\/([a-f0-9]{38})/);
+        if (match) resumeId = match[1];
+      }
       
       // SUPER-CLEANING: Remove anything after a newline or specific keywords
       title = title.split('\n')[0]; // Take only first line
@@ -275,16 +283,13 @@ async function performResumeUpdateAction() {
       
       let nextTimeStr = 'Готово';
       let hours, mins;
-      let isFutureTime = false;
 
       if (liftTimeMatch) {
         nextTimeStr = liftTimeMatch[1];
         [hours, mins] = nextTimeStr.split(':').map(Number);
-        isFutureTime = true;
       } else if (updateTimeMatch) {
         nextTimeStr = updateTimeMatch[1];
         [hours, mins] = nextTimeStr.split(':').map(Number);
-        // If it's an update time, the next lift is +4 hours
         hours += 4;
       } else if (generalTimeMatch) {
         nextTimeStr = generalTimeMatch[0];
@@ -301,7 +306,7 @@ async function performResumeUpdateAction() {
         }
       }
       
-      resumeDetails.push({ name: title, time: nextTimeStr });
+      resumeDetails.push({ id: resumeId, name: title, time: nextTimeStr });
     });
   } else {
     // ONLY run this if no cards were found
